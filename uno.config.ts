@@ -5,7 +5,7 @@ import { defineConfig, presetIcons, presetUno, transformerDirectives } from 'uno
 
 const iconPaths = globSync('./icons/*.svg');
 
-const collectionName = 'bolt';
+const collectionName = 'snapweb';
 
 const customIconCollection = iconPaths.reduce(
   (acc, iconPath) => {
@@ -98,11 +98,11 @@ const COLOR_PRIMITIVES = {
 };
 
 export default defineConfig({
-  safelist: [...Object.keys(customIconCollection[collectionName] || {}).map((x) => `i-bolt:${x}`)],
+  safelist: [...Object.keys(customIconCollection[collectionName] || {}).map((x) => `i-snapweb:${x}`)],
   shortcuts: {
-    'bolt-ease-cubic-bezier': 'ease-[cubic-bezier(0.4,0,0.2,1)]',
-    'transition-theme': 'transition-[background-color,border-color,color] duration-150 bolt-ease-cubic-bezier',
-    kdb: 'bg-bolt-elements-code-background text-bolt-elements-code-text py-1 px-1.5 rounded-md',
+    'snapweb-ease-cubic-bezier': 'ease-[cubic-bezier(0.4,0,0.2,1)]',
+        'transition-theme': 'transition-[background-color,border-color,color] duration-150 snapweb-ease-cubic-bezier',
+        kdb: 'bg-snapweb-elements-code-background text-snapweb-elements-code-text py-1 px-1.5 rounded-md',
     'max-w-chat': 'max-w-[var(--chat-max-width)]',
   },
   rules: [
@@ -115,115 +115,115 @@ export default defineConfig({
   theme: {
     colors: {
       ...COLOR_PRIMITIVES,
-      bolt: {
+      snapweb: {
         elements: {
-          borderColor: 'var(--bolt-elements-borderColor)',
-          borderColorActive: 'var(--bolt-elements-borderColorActive)',
+          borderColor: 'var(--snapweb-elements-borderColor)',
+          borderColorActive: 'var(--snapweb-elements-borderColorActive)',
           background: {
             depth: {
-              1: 'var(--bolt-elements-bg-depth-1)',
-              2: 'var(--bolt-elements-bg-depth-2)',
-              3: 'var(--bolt-elements-bg-depth-3)',
-              4: 'var(--bolt-elements-bg-depth-4)',
+              1: 'var(--snapweb-elements-bg-depth-1)',
+              2: 'var(--snapweb-elements-bg-depth-2)',
+              3: 'var(--snapweb-elements-bg-depth-3)',
+              4: 'var(--snapweb-elements-bg-depth-4)',
             },
           },
-          textPrimary: 'var(--bolt-elements-textPrimary)',
-          textSecondary: 'var(--bolt-elements-textSecondary)',
-          textTertiary: 'var(--bolt-elements-textTertiary)',
+          textPrimary: 'var(--snapweb-elements-textPrimary)',
+          textSecondary: 'var(--snapweb-elements-textSecondary)',
+          textTertiary: 'var(--snapweb-elements-textTertiary)',
           code: {
-            background: 'var(--bolt-elements-code-background)',
-            text: 'var(--bolt-elements-code-text)',
+            background: 'var(--snapweb-elements-code-background)',
+            text: 'var(--snapweb-elements-code-text)',
           },
           button: {
             primary: {
-              background: 'var(--bolt-elements-button-primary-background)',
-              backgroundHover: 'var(--bolt-elements-button-primary-backgroundHover)',
-              text: 'var(--bolt-elements-button-primary-text)',
+              background: 'var(--snapweb-elements-button-primary-background)',
+              backgroundHover: 'var(--snapweb-elements-button-primary-backgroundHover)',
+              text: 'var(--snapweb-elements-button-primary-text)',
             },
             secondary: {
-              background: 'var(--bolt-elements-button-secondary-background)',
-              backgroundHover: 'var(--bolt-elements-button-secondary-backgroundHover)',
-              text: 'var(--bolt-elements-button-secondary-text)',
+              background: 'var(--snapweb-elements-button-secondary-background)',
+              backgroundHover: 'var(--snapweb-elements-button-secondary-backgroundHover)',
+              text: 'var(--snapweb-elements-button-secondary-text)',
             },
             danger: {
-              background: 'var(--bolt-elements-button-danger-background)',
-              backgroundHover: 'var(--bolt-elements-button-danger-backgroundHover)',
-              text: 'var(--bolt-elements-button-danger-text)',
+              background: 'var(--snapweb-elements-button-danger-background)',
+              backgroundHover: 'var(--snapweb-elements-button-danger-backgroundHover)',
+              text: 'var(--snapweb-elements-button-danger-text)',
             },
           },
           item: {
-            contentDefault: 'var(--bolt-elements-item-contentDefault)',
-            contentActive: 'var(--bolt-elements-item-contentActive)',
-            contentAccent: 'var(--bolt-elements-item-contentAccent)',
-            contentDanger: 'var(--bolt-elements-item-contentDanger)',
-            backgroundDefault: 'var(--bolt-elements-item-backgroundDefault)',
-            backgroundActive: 'var(--bolt-elements-item-backgroundActive)',
-            backgroundAccent: 'var(--bolt-elements-item-backgroundAccent)',
-            backgroundDanger: 'var(--bolt-elements-item-backgroundDanger)',
+            contentDefault: 'var(--snapweb-elements-item-contentDefault)',
+            contentActive: 'var(--snapweb-elements-item-contentActive)',
+            contentAccent: 'var(--snapweb-elements-item-contentAccent)',
+            contentDanger: 'var(--snapweb-elements-item-contentDanger)',
+            backgroundDefault: 'var(--snapweb-elements-item-backgroundDefault)',
+            backgroundActive: 'var(--snapweb-elements-item-backgroundActive)',
+            backgroundAccent: 'var(--snapweb-elements-item-backgroundAccent)',
+            backgroundDanger: 'var(--snapweb-elements-item-backgroundDanger)',
           },
           actions: {
-            background: 'var(--bolt-elements-actions-background)',
+            background: 'var(--snapweb-elements-actions-background)',
             code: {
-              background: 'var(--bolt-elements-actions-code-background)',
+              background: 'var(--snapweb-elements-actions-code-background)',
             },
           },
           artifacts: {
-            background: 'var(--bolt-elements-artifacts-background)',
-            backgroundHover: 'var(--bolt-elements-artifacts-backgroundHover)',
-            borderColor: 'var(--bolt-elements-artifacts-borderColor)',
+            background: 'var(--snapweb-elements-artifacts-background)',
+            backgroundHover: 'var(--snapweb-elements-artifacts-backgroundHover)',
+            borderColor: 'var(--snapweb-elements-artifacts-borderColor)',
             inlineCode: {
-              background: 'var(--bolt-elements-artifacts-inlineCode-background)',
-              text: 'var(--bolt-elements-artifacts-inlineCode-text)',
+              background: 'var(--snapweb-elements-artifacts-inlineCode-background)',
+              text: 'var(--snapweb-elements-artifacts-inlineCode-text)',
             },
           },
           messages: {
-            background: 'var(--bolt-elements-messages-background)',
-            linkColor: 'var(--bolt-elements-messages-linkColor)',
+            background: 'var(--snapweb-elements-messages-background)',
+            linkColor: 'var(--snapweb-elements-messages-linkColor)',
             code: {
-              background: 'var(--bolt-elements-messages-code-background)',
+              background: 'var(--snapweb-elements-messages-code-background)',
             },
             inlineCode: {
-              background: 'var(--bolt-elements-messages-inlineCode-background)',
-              text: 'var(--bolt-elements-messages-inlineCode-text)',
+              background: 'var(--snapweb-elements-messages-inlineCode-background)',
+              text: 'var(--snapweb-elements-messages-inlineCode-text)',
             },
           },
           icon: {
-            success: 'var(--bolt-elements-icon-success)',
-            error: 'var(--bolt-elements-icon-error)',
-            primary: 'var(--bolt-elements-icon-primary)',
-            secondary: 'var(--bolt-elements-icon-secondary)',
-            tertiary: 'var(--bolt-elements-icon-tertiary)',
+            success: 'var(--snapweb-elements-icon-success)',
+            error: 'var(--snapweb-elements-icon-error)',
+            primary: 'var(--snapweb-elements-icon-primary)',
+            secondary: 'var(--snapweb-elements-icon-secondary)',
+            tertiary: 'var(--snapweb-elements-icon-tertiary)',
           },
           preview: {
             addressBar: {
-              background: 'var(--bolt-elements-preview-addressBar-background)',
-              backgroundHover: 'var(--bolt-elements-preview-addressBar-backgroundHover)',
-              backgroundActive: 'var(--bolt-elements-preview-addressBar-backgroundActive)',
-              text: 'var(--bolt-elements-preview-addressBar-text)',
-              textActive: 'var(--bolt-elements-preview-addressBar-textActive)',
+              background: 'var(--snapweb-elements-preview-addressBar-background)',
+              backgroundHover: 'var(--snapweb-elements-preview-addressBar-backgroundHover)',
+              backgroundActive: 'var(--snapweb-elements-preview-addressBar-backgroundActive)',
+              text: 'var(--snapweb-elements-preview-addressBar-text)',
+              textActive: 'var(--snapweb-elements-preview-addressBar-textActive)',
             },
           },
           terminals: {
-            background: 'var(--bolt-elements-terminals-background)',
-            buttonBackground: 'var(--bolt-elements-terminals-buttonBackground)',
+            background: 'var(--snapweb-elements-terminals-background)',
+            buttonBackground: 'var(--snapweb-elements-terminals-buttonBackground)',
           },
-          dividerColor: 'var(--bolt-elements-dividerColor)',
+          dividerColor: 'var(--snapweb-elements-dividerColor)',
           loader: {
-            background: 'var(--bolt-elements-loader-background)',
-            progress: 'var(--bolt-elements-loader-progress)',
+            background: 'var(--snapweb-elements-loader-background)',
+            progress: 'var(--snapweb-elements-loader-progress)',
           },
           prompt: {
-            background: 'var(--bolt-elements-prompt-background)',
+            background: 'var(--snapweb-elements-prompt-background)',
           },
           sidebar: {
-            dropdownShadow: 'var(--bolt-elements-sidebar-dropdownShadow)',
-            buttonBackgroundDefault: 'var(--bolt-elements-sidebar-buttonBackgroundDefault)',
-            buttonBackgroundHover: 'var(--bolt-elements-sidebar-buttonBackgroundHover)',
-            buttonText: 'var(--bolt-elements-sidebar-buttonText)',
+            dropdownShadow: 'var(--snapweb-elements-sidebar-dropdownShadow)',
+            buttonBackgroundDefault: 'var(--snapweb-elements-sidebar-buttonBackgroundDefault)',
+            buttonBackgroundHover: 'var(--snapweb-elements-sidebar-buttonBackgroundHover)',
+            buttonText: 'var(--snapweb-elements-sidebar-buttonText)',
           },
           cta: {
-            background: 'var(--bolt-elements-cta-background)',
-            text: 'var(--bolt-elements-cta-text)',
+            background: 'var(--snapweb-elements-cta-background)',
+            text: 'var(--snapweb-elements-cta-text)',
           },
         },
       },
