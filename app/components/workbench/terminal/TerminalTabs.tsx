@@ -35,7 +35,7 @@ export const TerminalTabs = memo(() => {
   const closeTerminal = (index: number) => {
     if (index === 0) {
       return;
-    } // Can't close bolt terminal
+    } // Can't close snapweb terminal
 
     const terminalRef = terminalRefs.current[index];
 
@@ -149,7 +149,7 @@ export const TerminalTabs = memo(() => {
                       onClick={() => setActiveTerminal(index)}
                     >
                       <div className="i-ph:terminal-window-duotone text-lg" />
-                      Bolt Terminal
+                      snapweb Terminal
                     </button>
                   ) : (
                     <React.Fragment>
