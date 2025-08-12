@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { ClientOnly } from 'remix-utils/client-only';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 
 import reactToastifyStyles from 'react-toastify/dist/ReactToastify.css?url';
 import globalStyles from './styles/index.scss?url';
@@ -45,12 +46,9 @@ const inlineThemeCode = stripIndents`
   setTutorialKitTheme();
 
   function setTutorialKitTheme() {
-    let theme = localStorage.getItem('bolt_theme');
-
-    if (!theme) {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-
+    // Always use dark theme - modern blue & black luxury design
+    const theme = 'dark';
+    localStorage.setItem('bolt_theme', theme);
     document.querySelector('html')?.setAttribute('data-theme', theme);
   }
 `;
@@ -96,8 +94,20 @@ export default function App() {
   }, []);
 
   return (
-    <Layout>
-      <Outlet />
-    </Layout>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        logStore.logError('Root application error', {
+          error: error.message,
+          stack: error.stack?.split('\n').slice(0, 5).join('\n'),
+          componentStack: errorInfo.componentStack?.split('\n').slice(0, 3).join('\n'),
+          timestamp: new Date().toISOString(),
+        });
+      }}
+      showErrorDetails={false}
+    >
+      <Layout>
+        <Outlet />
+      </Layout>
+    </ErrorBoundary>
   );
 }

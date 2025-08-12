@@ -10,6 +10,7 @@ import { NetlifyDeploymentLink } from '~/components/chat/NetlifyDeploymentLink.c
 import { VercelDeploymentLink } from '~/components/chat/VercelDeploymentLink.client';
 import { useVercelDeploy } from '~/components/deploy/VercelDeploy.client';
 import { useNetlifyDeploy } from '~/components/deploy/NetlifyDeploy.client';
+import { useTranslation } from '~/lib/i18n';
 
 interface DeployButtonProps {
   onVercelDeploy?: () => Promise<void>;
@@ -17,6 +18,7 @@ interface DeployButtonProps {
 }
 
 export const DeployButton = ({ onVercelDeploy, onNetlifyDeploy }: DeployButtonProps) => {
+  const { t } = useTranslation();
   const netlifyConn = useStore(netlifyConnection);
   const vercelConn = useStore(vercelConnection);
   const [activePreviewIndex] = useState(0);
@@ -67,7 +69,7 @@ export const DeployButton = ({ onVercelDeploy, onNetlifyDeploy }: DeployButtonPr
           disabled={isDeploying || !activePreview || isStreaming}
           className="rounded-md items-center justify-center [&:is(:disabled,.disabled)]:cursor-not-allowed [&:is(:disabled,.disabled)]:opacity-60 px-3 py-1.5 text-xs bg-accent-500 text-white hover:text-bolt-elements-item-contentAccent [&:not(:disabled,.disabled)]:hover:bg-bolt-elements-button-primary-backgroundHover outline-accent-500 flex gap-1.7"
         >
-          {isDeploying ? `Deploying to ${deployingTo}...` : 'Deploy'}
+          {isDeploying ? `${t('deploy.deploying')} ${deployingTo}...` : t('buttons.deploy')}
           <span className={classNames('i-ph:caret-down transition-transform')} />
         </DropdownMenu.Trigger>
         <DropdownMenu.Content
@@ -99,7 +101,9 @@ export const DeployButton = ({ onVercelDeploy, onNetlifyDeploy }: DeployButtonPr
               crossOrigin="anonymous"
               src="https://cdn.simpleicons.org/netlify"
             />
-            <span className="mx-auto">{!netlifyConn.user ? 'No Netlify Account Connected' : 'Deploy to Netlify'}</span>
+            <span className="mx-auto">
+              {!netlifyConn.user ? t('deploy.noNetlifyAccount') : t('deploy.deployToNetlify')}
+            </span>
             {netlifyConn.user && <NetlifyDeploymentLink />}
           </DropdownMenu.Item>
 
@@ -121,7 +125,9 @@ export const DeployButton = ({ onVercelDeploy, onNetlifyDeploy }: DeployButtonPr
               src="https://cdn.simpleicons.org/vercel/white"
               alt="vercel"
             />
-            <span className="mx-auto">{!vercelConn.user ? 'No Vercel Account Connected' : 'Deploy to Vercel'}</span>
+            <span className="mx-auto">
+              {!vercelConn.user ? t('deploy.noVercelAccount') : t('deploy.deployToVercel')}
+            </span>
             {vercelConn.user && <VercelDeploymentLink />}
           </DropdownMenu.Item>
 
@@ -137,7 +143,7 @@ export const DeployButton = ({ onVercelDeploy, onNetlifyDeploy }: DeployButtonPr
               src="https://cdn.simpleicons.org/cloudflare"
               alt="cloudflare"
             />
-            <span className="mx-auto">Deploy to Cloudflare (Coming Soon)</span>
+            <span className="mx-auto">{t('deploy.deployToCloudflare')}</span>
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>

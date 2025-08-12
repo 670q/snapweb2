@@ -505,6 +505,13 @@ export class WorkbenchStore {
 
           this.deployAlert.set(alert);
         },
+        () => {
+          // Auto-switch to preview when server is ready
+          const previews = this.previews.get();
+          if (previews.length > 0) {
+            this.currentView.set('preview');
+          }
+        },
       ),
     });
   }

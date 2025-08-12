@@ -12,6 +12,9 @@ import { DEFAULT_MODEL, DEFAULT_PROVIDER, PROMPT_COOKIE_KEY, PROVIDER_LIST } fro
 import { cubicEasingFn } from '~/utils/easings';
 import { createScopedLogger, renderLogger } from '~/utils/logger';
 import { BaseChat } from './BaseChat';
+import ErrorBoundary from '~/components/ui/ErrorBoundary';
+import { useErrorHandler } from '~/components/ui/ErrorBoundary';
+import { fallbackManager } from '~/lib/utils/fallbackManager';
 import Cookies from 'js-cookie';
 import { debounce } from '~/utils/debounce';
 import { useSettings } from '~/lib/hooks/useSettings';
@@ -28,6 +31,7 @@ import type { ElementInfo } from '~/components/workbench/Inspector';
 import type { TextUIPart, FileUIPart, Attachment } from '@ai-sdk/ui-utils';
 import { useMCPStore } from '~/lib/stores/mcp';
 import type { LlmErrorAlertType } from '~/types/actions';
+import { ProviderSwitchIndicator, useProviderSwitchIndicator } from './ProviderSwitchIndicator';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -41,12 +45,32 @@ export function Chat() {
 
   const { ready, initialMessages, storeMessageHistory, importChat, exportChat } = useChatHistory();
   const title = useStore(description);
+  const { handleError } = useErrorHandler();
+
   useEffect(() => {
     workbenchStore.setReloadedMessages(initialMessages.map((m) => m.id));
   }, [initialMessages]);
 
   return (
-    <>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        logger.error('Chat component error:', { error: error.message, errorInfo });
+        handleError(error, errorInfo);
+      }}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center p-6">
+            <div className="text-bolt-elements-textSecondary mb-4">حدث خطأ في واجهة الدردشة</div>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-bolt-elements-button-primary-background text-bolt-elements-button-primary-text rounded-md hover:bg-bolt-elements-button-primary-backgroundHover"
+            >
+              إعادة تحميل الصفحة
+            </button>
+          </div>
+        </div>
+      }
+    >
       {ready && (
         <ChatImpl
           description={title}
@@ -84,7 +108,7 @@ export function Chat() {
         transition={toastAnimation}
         autoClose={3000}
       />
-    </>
+    </ErrorBoundary>
   );
 }
 
@@ -124,6 +148,22 @@ export const ChatImpl = memo(
     const [imageDataList, setImageDataList] = useState<string[]>([]);
     const [searchParams, setSearchParams] = useSearchParams();
     const [fakeLoading, setFakeLoading] = useState(false);
+    
+    // Provider switch indicator state
+    const {
+      isVisible: isProviderSwitchVisible,
+      currentProvider: switchCurrentProvider,
+      targetProvider: switchTargetProvider,
+      status: switchStatus,
+      attempt: switchAttempt,
+      maxAttempts: switchMaxAttempts,
+      showSearching,
+      showConnecting,
+      showConnected,
+      showFailed,
+      updateAttempt,
+      hide: hideIndicator
+    } = useProviderSwitchIndicator();
     const files = useStore(workbenchStore.files);
     const [designScheme, setDesignScheme] = useState<DesignScheme>(defaultDesignScheme);
     const actionAlert = useStore(workbenchStore.alert);
@@ -137,6 +177,13 @@ export const ChatImpl = memo(
     const [llmErrorAlert, setLlmErrorAlert] = useState<LlmErrorAlertType | undefined>(undefined);
     const [model, setModel] = useState(() => {
       const savedModel = Cookies.get('selectedModel');
+
+      // If saved model is the problematic one, remove it and use default
+      if (savedModel === 'google/gemini-2.5-pro-exp-03-25') {
+        Cookies.remove('selectedModel');
+        return DEFAULT_MODEL;
+      }
+
       return savedModel || DEFAULT_MODEL;
     });
     const [provider, setProvider] = useState(() => {
@@ -265,19 +312,42 @@ export const ChatImpl = memo(
     };
 
     const handleError = useCallback(
-      (error: any, context: 'chat' | 'template' | 'llmcall' = 'chat') => {
+      async (error: any, context: 'chat' | 'template' | 'llmcall' = 'chat') => {
         logger.error(`${context} request failed`, error);
 
         stop();
         setFakeLoading(false);
 
+        try {
+          // Use fallback manager to handle the error and potentially retry with different provider
+          const result = await fallbackManager.executeWithFallback(
+            async (providerName) => {
+              /*
+               * This would be the retry logic with a different provider
+               * For now, we'll just log and continue with error handling
+               */
+              logger.info(`Attempting retry with provider: ${providerName}`);
+              throw error; // Re-throw to continue with normal error handling
+            },
+            provider.name,
+            context,
+          );
+
+          // If fallback succeeds, we wouldn't reach here
+          return result;
+        } catch (fallbackError) {
+          // Fallback failed, continue with normal error handling
+          logger.warn('All fallback providers failed, showing error to user');
+        }
+
         let errorInfo = {
-          message: 'An unexpected error occurred',
+          message: 'حدث خطأ غير متوقع',
           isRetryable: true,
           statusCode: 500,
           provider: provider.name,
           type: 'unknown' as const,
           retryDelay: 0,
+          retryAfter: undefined as number | undefined,
         };
 
         if (error.message) {
@@ -295,20 +365,29 @@ export const ChatImpl = memo(
         }
 
         let errorType: LlmErrorAlertType['errorType'] = 'unknown';
-        let title = 'Request Failed';
+        let title = 'فشل في الطلب';
 
         if (errorInfo.statusCode === 401 || errorInfo.message.toLowerCase().includes('api key')) {
           errorType = 'authentication';
-          title = 'Authentication Error';
+          title = 'خطأ في المصادقة';
+          errorInfo.message = 'مفتاح API غير صحيح أو منتهي الصلاحية';
         } else if (errorInfo.statusCode === 429 || errorInfo.message.toLowerCase().includes('rate limit')) {
           errorType = 'rate_limit';
-          title = 'Rate Limit Exceeded';
+          title = 'تم تجاوز حد المعدل';
+          errorInfo.message = 'تم تجاوز حد الطلبات المسموح. يرجى المحاولة لاحقاً';
+
+          // For rate limit errors, show retry information if available
+          if (errorInfo.retryAfter) {
+            title = `تم تجاوز حد المعدل - أعد المحاولة خلال ${errorInfo.retryAfter} ثانية`;
+          }
         } else if (errorInfo.message.toLowerCase().includes('quota')) {
           errorType = 'quota';
-          title = 'Quota Exceeded';
+          title = 'تم تجاوز الحصة المسموحة';
+          errorInfo.message = 'تم استنفاد الحصة المسموحة لهذا المزود';
         } else if (errorInfo.statusCode >= 500) {
           errorType = 'network';
-          title = 'Server Error';
+          title = 'خطأ في الخادم';
+          errorInfo.message = 'خطأ في الخادم. يرجى المحاولة لاحقاً';
         }
 
         logStore.logError(`${context} request failed`, error, {
@@ -321,7 +400,7 @@ export const ChatImpl = memo(
           provider: provider.name,
         });
 
-        // Create API error alert
+        // Create API error alert with retry functionality
         setLlmErrorAlert({
           type: 'error',
           title,
@@ -330,6 +409,12 @@ export const ChatImpl = memo(
           errorType,
         });
         setData([]);
+
+        // Show user-friendly toast notification
+        toast.error(errorInfo.message, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
       },
       [provider.name, stop],
     );
@@ -337,6 +422,34 @@ export const ChatImpl = memo(
     const clearApiErrorAlert = useCallback(() => {
       setLlmErrorAlert(undefined);
     }, []);
+
+    const retryLastMessage = useCallback(async () => {
+      if (messages.length === 0) {
+        return;
+      }
+
+      // Clear the error alert
+      setLlmErrorAlert(undefined);
+
+      // Get the last user message
+      const lastUserMessage = messages.filter((m) => m.role === 'user').pop();
+
+      if (!lastUserMessage) {
+        return;
+      }
+
+      // Remove any assistant messages after the last user message
+      const lastUserIndex = messages.findLastIndex((m) => m.id === lastUserMessage.id);
+      const messagesToKeep = messages.slice(0, lastUserIndex + 1);
+
+      // Update messages and retry
+      setMessages(messagesToKeep);
+
+      // Wait a bit for state to update, then retry
+      setTimeout(() => {
+        reload();
+      }, 100);
+    }, [messages, setMessages, reload]);
 
     useEffect(() => {
       const textarea = textareaRef.current;
@@ -618,6 +731,14 @@ export const ChatImpl = memo(
     }, []);
 
     const handleModelChange = (newModel: string) => {
+      // Prevent saving problematic models
+      if (newModel === 'google/gemini-2.5-pro-exp-03-25') {
+        setModel(DEFAULT_MODEL);
+        Cookies.remove('selectedModel');
+
+        return;
+      }
+
       setModel(newModel);
       Cookies.set('selectedModel', newModel, { expires: 30 });
     };
@@ -628,76 +749,90 @@ export const ChatImpl = memo(
     };
 
     return (
-      <BaseChat
-        ref={animationScope}
-        textareaRef={textareaRef}
-        input={input}
-        showChat={showChat}
-        chatStarted={chatStarted}
-        isStreaming={isLoading || fakeLoading}
-        onStreamingChange={(streaming) => {
-          streamingState.set(streaming);
-        }}
-        enhancingPrompt={enhancingPrompt}
-        promptEnhanced={promptEnhanced}
-        sendMessage={sendMessage}
-        model={model}
-        setModel={handleModelChange}
-        provider={provider}
-        setProvider={handleProviderChange}
-        providerList={activeProviders}
-        handleInputChange={(e) => {
-          onTextareaChange(e);
-          debouncedCachePrompt(e);
-        }}
-        handleStop={abort}
-        description={description}
-        importChat={importChat}
-        exportChat={exportChat}
-        messages={messages.map((message, i) => {
-          if (message.role === 'user') {
-            return message;
-          }
+      <>
+        <BaseChat
+          ref={animationScope}
+          textareaRef={textareaRef}
+          input={input}
+          showChat={showChat}
+          chatStarted={chatStarted}
+          isStreaming={isLoading || fakeLoading}
+          onStreamingChange={(streaming) => {
+            streamingState.set(streaming);
+          }}
+          enhancingPrompt={enhancingPrompt}
+          promptEnhanced={promptEnhanced}
+          sendMessage={sendMessage}
+          model={model}
+          setModel={handleModelChange}
+          provider={provider}
+          setProvider={handleProviderChange}
+          providerList={activeProviders}
+          handleInputChange={(e) => {
+            onTextareaChange(e);
+            debouncedCachePrompt(e);
+          }}
+          handleStop={abort}
+          description={description}
+          importChat={importChat}
+          exportChat={exportChat}
+          messages={messages.map((message, i) => {
+            if (message.role === 'user') {
+              return message;
+            }
 
-          return {
-            ...message,
-            content: parsedMessages[i] || '',
-          };
-        })}
-        enhancePrompt={() => {
-          enhancePrompt(
-            input,
-            (input) => {
-              setInput(input);
-              scrollTextArea();
-            },
-            model,
-            provider,
-            apiKeys,
-          );
-        }}
-        uploadedFiles={uploadedFiles}
-        setUploadedFiles={setUploadedFiles}
-        imageDataList={imageDataList}
-        setImageDataList={setImageDataList}
-        actionAlert={actionAlert}
-        clearAlert={() => workbenchStore.clearAlert()}
-        supabaseAlert={supabaseAlert}
-        clearSupabaseAlert={() => workbenchStore.clearSupabaseAlert()}
-        deployAlert={deployAlert}
-        clearDeployAlert={() => workbenchStore.clearDeployAlert()}
-        llmErrorAlert={llmErrorAlert}
-        clearLlmErrorAlert={clearApiErrorAlert}
-        data={chatData}
-        chatMode={chatMode}
-        setChatMode={setChatMode}
-        append={append}
-        designScheme={designScheme}
-        setDesignScheme={setDesignScheme}
-        selectedElement={selectedElement}
-        setSelectedElement={setSelectedElement}
-        addToolResult={addToolResult}
-      />
+            return {
+              ...message,
+              content: parsedMessages[i] || '',
+            };
+          })}
+          enhancePrompt={() => {
+            enhancePrompt(
+              input,
+              (input) => {
+                setInput(input);
+                scrollTextArea();
+              },
+              model,
+              provider,
+              apiKeys,
+            );
+          }}
+          uploadedFiles={uploadedFiles}
+          setUploadedFiles={setUploadedFiles}
+          imageDataList={imageDataList}
+          setImageDataList={setImageDataList}
+          actionAlert={actionAlert}
+          clearAlert={() => workbenchStore.clearAlert()}
+          supabaseAlert={supabaseAlert}
+          clearSupabaseAlert={() => workbenchStore.clearSupabaseAlert()}
+          deployAlert={deployAlert}
+          clearDeployAlert={() => workbenchStore.clearDeployAlert()}
+          llmErrorAlert={llmErrorAlert}
+          clearLlmErrorAlert={clearApiErrorAlert}
+          onRetryLlmError={retryLastMessage}
+          data={chatData}
+          chatMode={chatMode}
+          setChatMode={setChatMode}
+          append={append}
+          designScheme={designScheme}
+          setDesignScheme={setDesignScheme}
+          selectedElement={selectedElement}
+          setSelectedElement={setSelectedElement}
+          addToolResult={addToolResult}
+        />
+        
+        {/* Provider Switch Indicator */}
+        <ProviderSwitchIndicator
+          isVisible={isProviderSwitchVisible}
+          currentProvider={switchCurrentProvider}
+          targetProvider={switchTargetProvider}
+          status={switchStatus}
+          attempt={switchAttempt}
+          maxAttempts={switchMaxAttempts}
+          onClose={hideIndicator}
+        />
+      </>
     );
   },
 );

@@ -33,6 +33,7 @@ import { ChatBox } from './ChatBox';
 import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 import LlmErrorAlert from './LLMApiAlert';
+import { useTranslation } from '~/lib/i18n';
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -72,6 +73,7 @@ interface BaseChatProps {
   clearDeployAlert?: () => void;
   llmErrorAlert?: LlmErrorAlertType;
   clearLlmErrorAlert?: () => void;
+  onRetryLlmError?: () => void;
   data?: JSONValue[] | undefined;
   chatMode?: 'discuss' | 'build';
   setChatMode?: (mode: 'discuss' | 'build') => void;
@@ -119,6 +121,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       clearSupabaseAlert,
       llmErrorAlert,
       clearLlmErrorAlert,
+      onRetryLlmError,
       data,
       chatMode,
       setChatMode,
@@ -138,6 +141,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
     const [isListening, setIsListening] = useState(false);
+    const { t } = useTranslation();
     const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
     const [transcript, setTranscript] = useState('');
     const [isModelLoading, setIsModelLoading] = useState<string | undefined>('all');
@@ -351,10 +355,10 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             {!chatStarted && (
               <div id="intro" className="mt-[16vh] max-w-2xl mx-auto text-center px-4 lg:px-0">
                 <h1 className="text-3xl lg:text-6xl font-bold text-bolt-elements-textPrimary mb-4 animate-fade-in">
-                  حيث تبدأ الأفكار
+                  {t('intro.title')}
                 </h1>
                 <p className="text-md lg:text-xl mb-8 text-bolt-elements-textSecondary animate-fade-in animation-delay-200">
-                  حوّل أفكارك إلى واقع في ثوانٍ أو احصل على المساعدة في مشاريعك الحالية.
+                  {t('intro.subtitle')}
                 </p>
               </div>
             )}
@@ -421,7 +425,13 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                       }}
                     />
                   )}
-                  {llmErrorAlert && <LlmErrorAlert alert={llmErrorAlert} clearAlert={() => clearLlmErrorAlert?.()} />}
+                  {llmErrorAlert && (
+                    <LlmErrorAlert
+                      alert={llmErrorAlert}
+                      clearAlert={() => clearLlmErrorAlert?.()}
+                      onRetry={onRetryLlmError}
+                    />
+                  )}
                 </div>
                 {progressAnnotations && <ProgressCompilation data={progressAnnotations} />}
                 <ChatBox
@@ -503,6 +513,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
 );
 
 function ScrollToBottom() {
+  const { t } = useTranslation();
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
 
   return (
@@ -513,7 +524,7 @@ function ScrollToBottom() {
           className="sticky z-50 bottom-0 left-0 right-0 text-4xl rounded-lg px-1.5 py-0.5 flex items-center justify-center mx-auto gap-2 bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor text-bolt-elements-textPrimary text-sm"
           onClick={() => scrollToBottom()}
         >
-          Go to last message
+          {t('chat.goToLastMessage')}
           <span className="i-ph:arrow-down animate-bounce" />
         </button>
       </>

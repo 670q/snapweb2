@@ -5,9 +5,10 @@ import { classNames } from '~/utils/classNames';
 interface Props {
   alert: LlmErrorAlertType;
   clearAlert: () => void;
+  onRetry?: () => void;
 }
 
-export default function LlmErrorAlert({ alert, clearAlert }: Props) {
+export default function LlmErrorAlert({ alert, clearAlert, onRetry }: Props) {
   const { title, description, provider, errorType } = alert;
 
   const getErrorIcon = () => {
@@ -27,8 +28,29 @@ export default function LlmErrorAlert({ alert, clearAlert }: Props) {
     switch (errorType) {
       case 'authentication':
         return `Authentication failed with ${provider}. Please check your API key.`;
-      case 'rate_limit':
-        return `Rate limit exceeded for ${provider}. Please wait before retrying.`;
+      case 'rate_limit': {
+        const baseMessage = `Rate limit exceeded for ${provider}.`;
+
+        // Check for OpenRouter specific rate limiting messages
+        if (description && description.includes('temporarily rate-limited upstream')) {
+          return `${baseMessage} The model is temporarily rate-limited by the upstream provider. We're automatically trying alternative models and will retry with exponential backoff. This usually resolves within a few minutes.`;
+        }
+
+        if (description && description.includes('retryAfter')) {
+          try {
+            const errorData = JSON.parse(description);
+
+            if (errorData.retryAfter) {
+              return `${baseMessage} Please wait ${errorData.retryAfter} seconds before retrying.`;
+            }
+          } catch {
+            // If parsing fails, fall back to basic message
+          }
+        }
+
+        // Enhanced rate limit message with fallback info
+        return `${baseMessage} We're automatically retrying with exponential backoff and trying alternative models. Please wait a moment.`;
+      }
       case 'quota':
         return `Quota exceeded for ${provider}. Please check your account limits.`;
       default:
@@ -87,6 +109,20 @@ export default function LlmErrorAlert({ alert, clearAlert }: Props) {
               transition={{ delay: 0.3 }}
             >
               <div className="flex gap-2">
+                {onRetry && (errorType === 'rate_limit' || errorType === 'network') && (
+                  <button
+                    onClick={onRetry}
+                    className={classNames(
+                      'px-2 py-1.5 rounded-md text-sm font-medium',
+                      'bg-bolt-elements-button-primary-background',
+                      'hover:bg-bolt-elements-button-primary-backgroundHover',
+                      'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-bolt-elements-button-primary-background',
+                      'text-bolt-elements-button-primary-text',
+                    )}
+                  >
+                    Retry
+                  </button>
+                )}
                 <button
                   onClick={clearAlert}
                   className={classNames(

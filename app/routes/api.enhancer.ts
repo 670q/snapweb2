@@ -4,6 +4,7 @@ import { stripIndents } from '~/utils/stripIndent';
 import type { ProviderInfo } from '~/types/model';
 import { getApiKeysFromCookie, getProviderSettingsFromCookie } from '~/lib/api/cookies';
 import { createScopedLogger } from '~/utils/logger';
+import { enhancerRateLimiter, createRateLimitResponse } from '~/lib/.server/rate-limiter';
 
 export async function action(args: ActionFunctionArgs) {
   return enhancerAction(args);
@@ -12,6 +13,16 @@ export async function action(args: ActionFunctionArgs) {
 const logger = createScopedLogger('api.enhancher');
 
 async function enhancerAction({ context, request }: ActionFunctionArgs) {
+  // Check rate limit first
+  const rateLimitResult = enhancerRateLimiter.checkLimit(request);
+
+  if (!rateLimitResult.allowed) {
+    logger.warn(`Rate limit exceeded for enhancer request`);
+    return createRateLimitResponse(rateLimitResult.resetTime!);
+  }
+
+  logger.debug(`Enhancer rate limit check passed. Remaining: ${rateLimitResult.remaining}`);
+
   const { message, model, provider } = await request.json<{
     message: string;
     model: string;

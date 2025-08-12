@@ -10,9 +10,11 @@ import { getFilePaths, selectContext } from '~/lib/.server/llm/select-context';
 import type { ContextAnnotation, ProgressAnnotation } from '~/types/context';
 import { WORK_DIR } from '~/utils/constants';
 import { createSummary } from '~/lib/.server/llm/create-summary';
+import { chatRateLimiter, createRateLimitResponse } from '~/lib/.server/rate-limiter';
 import { extractPropertiesFromMessage } from '~/lib/.server/llm/utils';
 import type { DesignScheme } from '~/types/design-scheme';
 import { MCPService } from '~/lib/services/mcpService';
+import { errorHandler } from '~/lib/utils/errorHandler';
 
 export async function action(args: ActionFunctionArgs) {
   return chatAction(args);
@@ -39,6 +41,16 @@ function parseCookies(cookieHeader: string): Record<string, string> {
 }
 
 async function chatAction({ context, request }: ActionFunctionArgs) {
+  // Check rate limit first
+  const rateLimitResult = chatRateLimiter.checkLimit(request);
+
+  if (!rateLimitResult.allowed) {
+    logger.warn(`Rate limit exceeded for chat request`);
+    return createRateLimitResponse(rateLimitResult.resetTime!);
+  }
+
+  logger.debug(`Rate limit check passed. Remaining: ${rateLimitResult.remaining}`);
+
   const { messages, files, promptId, contextOptimization, supabase, chatMode, designScheme, maxLLMSteps } =
     await request.json<{
       messages: Messages;
@@ -373,36 +385,129 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
       },
     });
   } catch (error: any) {
-    logger.error(error);
+    logger.error('Chat API Error:', error);
 
+    // Use enhanced error handler
+    const errorDetails = errorHandler.handleApiError(error, 'Chat API');
+
+    // Create enhanced error response
     const errorResponse = {
       error: true,
-      message: error.message || 'An unexpected error occurred',
-      statusCode: error.statusCode || 500,
-      isRetryable: error.isRetryable !== false, // Default to retryable unless explicitly false
-      provider: error.provider || 'unknown',
+      message: errorDetails.message,
+      statusCode: errorDetails.status || 500,
+      isRetryable: errorDetails.status ? [429, 500, 502, 503, 504].includes(errorDetails.status) : true,
+      provider: errorDetails.provider || 'unknown',
+      code: errorDetails.code,
+      timestamp: errorDetails.timestamp,
     };
 
-    if (error.message?.includes('API key')) {
+    // Handle specific error types with appropriate responses
+    if (errorDetails.status === 401 || error.message?.includes('API key')) {
       return new Response(
         JSON.stringify({
           ...errorResponse,
-          message: 'Invalid or missing API key',
+          message: 'مفتاح API غير صحيح أو مفقود. يرجى التحقق من إعدادات API.',
           statusCode: 401,
           isRetryable: false,
+          errorType: 'authentication',
         }),
         {
           status: 401,
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
           statusText: 'Unauthorized',
         },
       );
     }
 
-    return new Response(JSON.stringify(errorResponse), {
-      status: errorResponse.statusCode,
-      headers: { 'Content-Type': 'application/json' },
-      statusText: 'Error',
-    });
+    // Enhanced rate limiting error handling
+    if (errorDetails.status === 429 || error.message?.includes('rate limit')) {
+      const isUpstreamRateLimit = error.message?.includes('temporarily rate-limited upstream');
+      const retryAfter = errorDetails.retryAfter || 60;
+
+      return new Response(
+        JSON.stringify({
+          ...errorResponse,
+          message: isUpstreamRateLimit
+            ? 'النموذج محدود مؤقتاً من قبل المزود. سنحاول نماذج بديلة ونعيد المحاولة تلقائياً.'
+            : `تم تجاوز حد الطلبات. سنعيد المحاولة خلال ${retryAfter} ثانية.`,
+          statusCode: 429,
+          isRetryable: true,
+          errorType: 'rate_limit',
+          retryAfter,
+          description: error.message,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': retryAfter.toString(),
+            'Cache-Control': 'no-cache',
+          },
+          statusText: 'Too Many Requests',
+        },
+      );
+    }
+
+    // Handle quota exceeded errors
+    if (error.message?.toLowerCase().includes('quota')) {
+      return new Response(
+        JSON.stringify({
+          ...errorResponse,
+          message: 'تم تجاوز حد الاستخدام المسموح. يرجى المحاولة لاحقاً أو استخدام نموذج آخر.',
+          statusCode: 429,
+          isRetryable: false,
+          errorType: 'quota',
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+          statusText: 'Quota Exceeded',
+        },
+      );
+    }
+
+    // Handle server errors with fallback
+    if (errorDetails.status && errorDetails.status >= 500) {
+      return new Response(
+        JSON.stringify({
+          ...errorResponse,
+          message: 'خطأ في الخادم. سنحاول مرة أخرى تلقائياً.',
+          statusCode: errorDetails.status,
+          isRetryable: true,
+          errorType: 'server_error',
+        }),
+        {
+          status: errorDetails.status,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+          statusText: 'Server Error',
+        },
+      );
+    }
+
+    // Default error response
+    return new Response(
+      JSON.stringify({
+        ...errorResponse,
+        message: 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
+        errorType: 'unknown',
+      }),
+      {
+        status: errorResponse.statusCode,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+        statusText: 'Error',
+      },
+    );
   }
 }

@@ -233,7 +233,6 @@ export default defineConfig({
   presets: [
     presetUno({
       dark: {
-        light: '[data-theme="light"]',
         dark: '[data-theme="dark"]',
       },
     }),

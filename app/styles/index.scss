@@ -14,14 +14,75 @@ body {
   background-color: var(--bolt-elements-bg-depth-1);
 }
 
+/* RTL Support */
+html[dir="rtl"] {
+  direction: rtl;
+}
+
+html[dir="ltr"] {
+  direction: ltr;
+}
+
+/* RTL-specific styles - More targeted approach */
+/* Only apply RTL styles to text content and specific UI elements */
+[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+[dir="rtl"] .text-right {
+  text-align: left;
+}
+
+/* RTL support for navigation and menu items */
+[dir="rtl"] .nav-item,
+[dir="rtl"] .menu-item {
+  flex-direction: row-reverse;
+}
+
+/* RTL support for specific components that need reversed layout */
+[dir="rtl"] .breadcrumb,
+[dir="rtl"] .pagination {
+  flex-direction: row-reverse;
+}
+
+/* Margin adjustments for RTL */
+[dir="rtl"] .ml-auto {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+[dir="rtl"] .mr-auto {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+/* Padding adjustments for RTL - only for specific cases */
+[dir="rtl"] .sidebar .pl-4 {
+  padding-left: 0;
+  padding-right: 1rem;
+}
+
+[dir="rtl"] .sidebar .pr-4 {
+  padding-right: 0;
+  padding-left: 1rem;
+}
+
+/* Border adjustments for RTL */
+[dir="rtl"] .border-l {
+  border-left: none;
+  border-right: 1px solid;
+}
+
+[dir="rtl"] .border-r {
+  border-right: none;
+  border-left: 1px solid;
+}
+
 :root {
   --gradient-opacity: 0.8;
-  --primary-color: rgba(158, 117, 240, var(--gradient-opacity));
-  --secondary-color: rgba(138, 43, 226, var(--gradient-opacity));
-  --accent-color: rgba(128, 59, 239, var(--gradient-opacity));
-  // --primary-color: rgba(147, 112, 219, var(--gradient-opacity));
-  // --secondary-color: rgba(138, 43, 226, var(--gradient-opacity));
-  // --accent-color: rgba(180, 170, 220, var(--gradient-opacity));
+  --primary-color: rgba(59, 130, 246, var(--gradient-opacity));
+  --secondary-color: rgba(30, 64, 175, var(--gradient-opacity));
+  --accent-color: rgba(37, 99, 235, var(--gradient-opacity));
 }
 
 .modern-scrollbar {

@@ -4,9 +4,12 @@ import { chatStore } from '~/lib/stores/chat';
 import { classNames } from '~/utils/classNames';
 import { HeaderActionButtons } from './HeaderActionButtons.client';
 import { ChatDescription } from '~/lib/persistence/ChatDescription.client';
+import { LanguageToggle } from '~/components/ui/LanguageToggle';
+import { useTranslation } from '~/lib/i18n';
 
 export function Header() {
   const chat = useStore(chatStore);
+  const { t } = useTranslation();
 
   return (
     <header
@@ -18,7 +21,7 @@ export function Header() {
       <div className="flex items-center gap-2 z-logo text-bolt-elements-textPrimary cursor-pointer">
         <div className="i-ph:sidebar-simple-duotone text-xl" />
         <a href="/" className="text-2xl font-semibold text-accent flex items-center">
-          <span className="text-2xl font-bold">snapweb</span>
+          <span className="text-2xl font-bold">{t('header.title')}</span>
         </a>
       </div>
       {chat.started && ( // Display ChatDescription and HeaderActionButtons only when the chat has started.
@@ -28,7 +31,8 @@ export function Header() {
           </span>
           <ClientOnly>
             {() => (
-              <div className="">
+              <div className="flex items-center gap-2">
+                <LanguageToggle />
                 <HeaderActionButtons chatStarted={chat.started} />
               </div>
             )}

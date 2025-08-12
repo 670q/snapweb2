@@ -72,6 +72,7 @@ export class ActionRunner {
   onAlert?: (alert: ActionAlert) => void;
   onSupabaseAlert?: (alert: SupabaseAlert) => void;
   onDeployAlert?: (alert: DeployAlert) => void;
+  onServerReady?: () => void;
   buildOutput?: { path: string; exitCode: number; output: string };
 
   constructor(
@@ -80,12 +81,14 @@ export class ActionRunner {
     onAlert?: (alert: ActionAlert) => void,
     onSupabaseAlert?: (alert: SupabaseAlert) => void,
     onDeployAlert?: (alert: DeployAlert) => void,
+    onServerReady?: () => void,
   ) {
     this.#webcontainer = webcontainerPromise;
     this.#shellTerminal = getShellTerminal;
     this.onAlert = onAlert;
     this.onSupabaseAlert = onSupabaseAlert;
     this.onDeployAlert = onDeployAlert;
+    this.onServerReady = onServerReady;
   }
 
   addAction(data: ActionCallbackData) {
@@ -294,6 +297,11 @@ export class ActionRunner {
 
     if (resp?.exitCode != 0) {
       throw new ActionCommandError('Failed To Start Application', resp?.output || 'No Output Available');
+    }
+
+    // Call onServerReady callback when start action succeeds
+    if (this.onServerReady) {
+      this.onServerReady();
     }
 
     return resp;

@@ -8,6 +8,8 @@ import { LLMManager } from '~/lib/modules/llm/manager';
 import type { ModelInfo } from '~/lib/modules/llm/types';
 import { getApiKeysFromCookie, getProviderSettingsFromCookie } from '~/lib/api/cookies';
 import { createScopedLogger } from '~/utils/logger';
+import { llmCallRateLimiter, createRateLimitResponse } from '~/lib/.server/rate-limiter';
+import { errorHandler } from '~/lib/utils/errorHandler';
 
 export async function action(args: ActionFunctionArgs) {
   return llmCallAction(args);
@@ -25,6 +27,16 @@ async function getModelList(options: {
 const logger = createScopedLogger('api.llmcall');
 
 async function llmCallAction({ context, request }: ActionFunctionArgs) {
+  // Check rate limit first
+  const rateLimitResult = llmCallRateLimiter.checkLimit(request);
+
+  if (!rateLimitResult.allowed) {
+    logger.warn(`Rate limit exceeded for LLM call request`);
+    return createRateLimitResponse(rateLimitResult.resetTime!);
+  }
+
+  logger.debug(`LLM call rate limit check passed. Remaining: ${rateLimitResult.remaining}`);
+
   const { system, message, model, provider, streamOutput } = await request.json<{
     system: string;
     message: string;
@@ -78,19 +90,43 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
         },
       });
     } catch (error: unknown) {
-      console.log(error);
+      logger.error('LLM Stream Error:', error);
 
-      if (error instanceof Error && error.message?.includes('API key')) {
-        throw new Response('Invalid or missing API key', {
-          status: 401,
-          statusText: 'Unauthorized',
-        });
+      const errorDetails = errorHandler.handleLLMError(error, providerName);
+
+      if (errorDetails.status === 401 || (error instanceof Error && error.message?.includes('API key'))) {
+        throw new Response(
+          JSON.stringify({
+            error: true,
+            message: 'مفتاح API غير صحيح أو مفقود للمزود المحدد.',
+            statusCode: 401,
+            isRetryable: false,
+            errorType: 'authentication',
+            provider: providerName,
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+            statusText: 'Unauthorized',
+          },
+        );
       }
 
-      throw new Response(null, {
-        status: 500,
-        statusText: 'Internal Server Error',
-      });
+      throw new Response(
+        JSON.stringify({
+          error: true,
+          message: errorDetails.message || 'حدث خطأ أثناء معالجة الطلب.',
+          statusCode: errorDetails.status || 500,
+          isRetryable: errorDetails.status ? [429, 500, 502, 503, 504].includes(errorDetails.status) : true,
+          provider: providerName,
+          timestamp: errorDetails.timestamp,
+        }),
+        {
+          status: errorDetails.status || 500,
+          headers: { 'Content-Type': 'application/json' },
+          statusText: 'Internal Server Error',
+        },
+      );
     }
   } else {
     try {
@@ -137,37 +173,99 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
         },
       });
     } catch (error: unknown) {
-      console.log(error);
+      logger.error('LLM Generate Error:', error);
+
+      const errorDetails = errorHandler.handleLLMError(error, providerName);
 
       const errorResponse = {
         error: true,
-        message: error instanceof Error ? error.message : 'An unexpected error occurred',
-        statusCode: (error as any).statusCode || 500,
-        isRetryable: (error as any).isRetryable !== false,
-        provider: (error as any).provider || 'unknown',
+        message: errorDetails.message,
+        statusCode: errorDetails.status || 500,
+        isRetryable: errorDetails.status ? [429, 500, 502, 503, 504].includes(errorDetails.status) : true,
+        provider: providerName,
+        code: errorDetails.code,
+        timestamp: errorDetails.timestamp,
       };
 
-      if (error instanceof Error && error.message?.includes('API key')) {
+      if (errorDetails.status === 401 || (error instanceof Error && error.message?.includes('API key'))) {
         return new Response(
           JSON.stringify({
             ...errorResponse,
-            message: 'Invalid or missing API key',
+            message: 'مفتاح API غير صحيح أو مفقود للمزود المحدد.',
             statusCode: 401,
             isRetryable: false,
+            errorType: 'authentication',
           }),
           {
             status: 401,
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache',
+            },
             statusText: 'Unauthorized',
           },
         );
       }
 
-      return new Response(JSON.stringify(errorResponse), {
-        status: errorResponse.statusCode,
-        headers: { 'Content-Type': 'application/json' },
-        statusText: 'Error',
-      });
+      // Handle rate limiting
+      if (errorDetails.status === 429) {
+        return new Response(
+          JSON.stringify({
+            ...errorResponse,
+            message: `تم تجاوز حد الطلبات للمزود ${providerName}. يرجى المحاولة لاحقاً.`,
+            statusCode: 429,
+            isRetryable: true,
+            errorType: 'rate_limit',
+            retryAfter: errorDetails.retryAfter || 60,
+          }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'Retry-After': (errorDetails.retryAfter || 60).toString(),
+              'Cache-Control': 'no-cache',
+            },
+            statusText: 'Too Many Requests',
+          },
+        );
+      }
+
+      // Handle quota errors
+      if (error instanceof Error && error.message?.toLowerCase().includes('quota')) {
+        return new Response(
+          JSON.stringify({
+            ...errorResponse,
+            message: `تم تجاوز حد الاستخدام للمزود ${providerName}. يرجى استخدام مزود آخر.`,
+            statusCode: 429,
+            isRetryable: false,
+            errorType: 'quota',
+          }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache',
+            },
+            statusText: 'Quota Exceeded',
+          },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          ...errorResponse,
+          message: errorResponse.message || 'حدث خطأ أثناء توليد النص.',
+          errorType: 'generation_error',
+        }),
+        {
+          status: errorResponse.statusCode,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+          statusText: 'Error',
+        },
+      );
     }
   }
 }
