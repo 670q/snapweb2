@@ -80,29 +80,23 @@ export function ProviderSwitchIndicator({
             className={classNames(
               'flex items-center gap-3 px-4 py-3 rounded-lg border-2 shadow-lg backdrop-blur-sm',
               'min-w-[300px] max-w-[400px]',
-              getStatusColor()
+              getStatusColor(),
             )}
           >
             <div className="flex-shrink-0">{getStatusIcon()}</div>
-            
+
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">
-                {getStatusMessage()}
-              </div>
-              
+              <div className="text-sm font-medium truncate">{getStatusMessage()}</div>
+
               {currentProvider && targetProvider && status === 'connecting' && (
                 <div className="text-xs opacity-75 mt-1">
                   {currentProvider} → {targetProvider}
                 </div>
               )}
-              
-              {status === 'searching' && (
-                <div className="text-xs opacity-75 mt-1">
-                  فحص المزودات المتاحة...
-                </div>
-              )}
+
+              {status === 'searching' && <div className="text-xs opacity-75 mt-1">فحص المزودات المتاحة...</div>}
             </div>
-            
+
             {(status === 'connected' || status === 'failed') && onClose && (
               <button
                 onClick={onClose}
@@ -113,7 +107,7 @@ export function ProviderSwitchIndicator({
               </button>
             )}
           </div>
-          
+
           {/* Progress bar for connecting status */}
           {status === 'connecting' && (
             <motion.div
@@ -163,7 +157,7 @@ export function useProviderSwitchIndicator() {
     setTargetProvider(targetProv);
     setStatus('connected');
     setIsVisible(true);
-    
+
     // Auto-hide after 3 seconds
     setTimeout(() => {
       setIsVisible(false);
@@ -174,7 +168,7 @@ export function useProviderSwitchIndicator() {
     setTargetProvider(targetProv);
     setStatus('failed');
     setIsVisible(true);
-    
+
     // Auto-hide after 5 seconds
     setTimeout(() => {
       setIsVisible(false);

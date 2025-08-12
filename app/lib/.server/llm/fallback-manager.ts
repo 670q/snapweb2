@@ -38,16 +38,16 @@ const FALLBACK_MODELS: FallbackModel[] = [
 
   // Last resort fallbacks
   { model: 'cohere/command', provider: 'OpenRouter', priority: 7 },
-  
+
   // Local providers (lower priority but good for offline scenarios)
   { model: 'llama3.2:latest', provider: 'Ollama', priority: 8 },
   { model: 'qwen2.5:latest', provider: 'Ollama', priority: 9 },
   { model: 'mistral:latest', provider: 'Ollama', priority: 10 },
   { model: 'codellama:latest', provider: 'Ollama', priority: 11 },
-  
+
   // LM Studio models (if available locally)
   { model: 'local-model', provider: 'LMStudio', priority: 12 },
-  
+
   // OpenAI models (backup)
   { model: 'gpt-4o-mini', provider: 'OpenAI', priority: 13 },
   { model: 'gpt-3.5-turbo', provider: 'OpenAI', priority: 14 },
@@ -81,23 +81,23 @@ export class FallbackManager {
       apiKeys?: Record<string, string>;
       providerSettings?: Record<string, IProviderSetting>;
       serverEnv?: any;
-    }
+    },
   ): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       // Special handling for local providers
       if (provider.name === 'Ollama') {
         return await this._checkOllamaHealth();
       }
-      
+
       if (provider.name === 'LMStudio') {
         return await this._checkLMStudioHealth();
       }
-      
+
       // Create a simple test model instance to check connectivity
       const testModel = provider.staticModels?.[0]?.name || 'test-model';
-      
+
       // Create timeout promise for health check
       const healthCheckPromise = new Promise<void>((resolve, reject) => {
         try {
@@ -108,7 +108,7 @@ export class FallbackManager {
             apiKeys: options.apiKeys,
             providerSettings: options.providerSettings,
           });
-          
+
           if (modelInstance) {
             resolve();
           } else {
@@ -118,18 +118,18 @@ export class FallbackManager {
           reject(error);
         }
       });
-      
+
       const timeoutPromise = new Promise<void>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Health check timeout'));
         }, this._healthCheckTimeout);
       });
-      
+
       await Promise.race([healthCheckPromise, timeoutPromise]);
-      
+
       const responseTime = Date.now() - startTime;
       logger.debug(`Health check passed for ${provider.name} in ${responseTime}ms`);
-      
+
       return {
         success: true,
         responseTime,
@@ -137,7 +137,7 @@ export class FallbackManager {
     } catch (error: any) {
       const responseTime = Date.now() - startTime;
       logger.warn(`Health check failed for ${provider.name}: ${error.message}`);
-      
+
       return {
         success: false,
         responseTime,
@@ -145,22 +145,22 @@ export class FallbackManager {
       };
     }
   }
-  
+
   /**
    * Check Ollama health by pinging its API
    */
   private async _checkOllamaHealth(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       // Try to connect to Ollama's default endpoint
       const response = await fetch('http://localhost:11434/api/tags', {
         method: 'GET',
         signal: AbortSignal.timeout(5000), // 5 second timeout
       });
-      
+
       const responseTime = Date.now() - startTime;
-      
+
       if (response.ok) {
         logger.debug(`🟢 Ollama health check passed in ${responseTime}ms`);
         return {
@@ -173,7 +173,7 @@ export class FallbackManager {
     } catch (error: any) {
       const responseTime = Date.now() - startTime;
       logger.debug(`🔴 Ollama health check failed: ${error.message}`);
-      
+
       return {
         success: false,
         responseTime,
@@ -181,22 +181,22 @@ export class FallbackManager {
       };
     }
   }
-  
+
   /**
    * Check LM Studio health by pinging its API
    */
   private async _checkLMStudioHealth(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       // Try to connect to LM Studio's default endpoint
       const response = await fetch('http://localhost:1234/v1/models', {
         method: 'GET',
         signal: AbortSignal.timeout(5000), // 5 second timeout
       });
-      
+
       const responseTime = Date.now() - startTime;
-      
+
       if (response.ok) {
         logger.debug(`🟢 LM Studio health check passed in ${responseTime}ms`);
         return {
@@ -209,7 +209,7 @@ export class FallbackManager {
     } catch (error: any) {
       const responseTime = Date.now() - startTime;
       logger.debug(`🔴 LM Studio health check failed: ${error.message}`);
-      
+
       return {
         success: false,
         responseTime,
@@ -227,23 +227,23 @@ export class FallbackManager {
       apiKeys?: Record<string, string>;
       providerSettings?: Record<string, IProviderSetting>;
       serverEnv?: any;
-    }
+    },
   ): Promise<boolean> {
     const providerName = provider.name;
     const now = new Date();
     const cachedHealth = this._providerHealth.get(providerName);
-    
+
     // Check if we have recent health data
-    if (cachedHealth && 
-        (now.getTime() - cachedHealth.lastChecked.getTime()) < this._healthCheckCacheDuration) {
+    if (cachedHealth && now.getTime() - cachedHealth.lastChecked.getTime() < this._healthCheckCacheDuration) {
       logger.debug(`Using cached health status for ${providerName}: ${cachedHealth.isHealthy}`);
       return cachedHealth.isHealthy;
     }
-    
+
     // Perform new health check
     logger.debug(`Performing health check for ${providerName}`);
+
     const healthResult = await this._performHealthCheck(provider, options);
-    
+
     // Cache the result
     this._providerHealth.set(providerName, {
       isHealthy: healthResult.success,
@@ -251,7 +251,7 @@ export class FallbackManager {
       responseTime: healthResult.responseTime,
       error: healthResult.error,
     });
-    
+
     return healthResult.success;
   }
 
@@ -275,7 +275,7 @@ export class FallbackManager {
     const availableFallbacks = FALLBACK_MODELS.filter(
       (fallback) => !(fallback.model === failedModel && fallback.provider === failedProvider),
     ).sort((a, b) => a.priority - b.priority);
-    
+
     logger.debug(`📋 تم العثور على ${availableFallbacks.length} مزود بديل محتمل`);
 
     for (const fallback of availableFallbacks) {
@@ -287,7 +287,7 @@ export class FallbackManager {
           logger.warn(`⚠️ المزود ${fallback.provider} غير موجود، تخطي النموذج البديل ${fallback.model}`);
           continue;
         }
-        
+
         logger.debug(`🔍 فحص المزود البديل: ${fallback.model} (${fallback.provider})`);
 
         // Perform health check first
@@ -301,7 +301,7 @@ export class FallbackManager {
           logger.debug(`❌ فشل فحص صحة المزود ${fallback.provider}، تخطي هذا المزود`);
           continue;
         }
-        
+
         logger.debug(`✅ المزود ${fallback.provider} يبدو صحياً، فحص توفر النموذج...`);
 
         // Check if the model is available in the provider
@@ -328,15 +328,16 @@ export class FallbackManager {
 
     // If no fallback found, return default (but check its health first)
     logger.warn('⚠️ لا توجد نماذج بديلة متاحة، فحص المزود الافتراضي');
-    
+
     try {
       logger.debug('🔍 فحص صحة المزود الافتراضي...');
+
       const isDefaultHealthy = await this._isProviderHealthy(DEFAULT_PROVIDER, {
         apiKeys,
         providerSettings,
         serverEnv,
       });
-      
+
       if (isDefaultHealthy) {
         logger.info(`✅ المزود الافتراضي متاح: ${DEFAULT_MODEL}`);
         return {
@@ -351,6 +352,7 @@ export class FallbackManager {
     }
 
     logger.error('🚫 لا توجد مزودات صحية متاحة على الإطلاق');
+
     return null; // No healthy providers available
   }
 

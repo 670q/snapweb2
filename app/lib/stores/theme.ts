@@ -21,7 +21,7 @@ function initStore(): Theme {
 export function toggleTheme() {
   // Theme is locked to dark mode - no toggle functionality
   const theme = 'dark';
-  
+
   // Ensure dark theme is set
   themeStore.set(theme);
   localStorage.setItem(kTheme, theme);

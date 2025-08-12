@@ -200,7 +200,7 @@ export async function streamText(props: {
 
   // Enhanced retry and fallback system with timeout and better error handling
   let currentModelDetails = modelDetails;
-  let fallbackAttempted = false;
+  const fallbackAttempted = false;
   let fallbackCount = 0;
   const maxFallbackAttempts = 3;
   const requestTimeout = 30000; // 30 seconds timeout
@@ -224,50 +224,50 @@ export async function streamText(props: {
       ...options,
     });
 
-    return Promise.race([
-      streamPromise,
-      createTimeoutPromise(requestTimeout)
-    ]);
+    return Promise.race([streamPromise, createTimeoutPromise(requestTimeout)]);
   };
 
   // Main execution with enhanced fallback
   let retryResult: any;
-  
+
   while (fallbackCount <= maxFallbackAttempts) {
     try {
       logger.info(`Attempt ${fallbackCount + 1}: Using ${currentModelDetails.name} (${provider.name})`);
-      
+
       // Show fallback notification to user if this is not the first attempt
       if (fallbackCount > 0) {
         logger.info(`🔄 جاري المحاولة مع مزود بديل: ${currentModelDetails.name}`);
         logger.info(`📡 محاولة الاتصال بالمزود البديل...`);
       }
 
-      retryResult = await rateLimitRetryHandler.executeWithRetry(async () => {
-        return await executeStreamTextWithTimeout(
-          provider.getModelInstance({
-            model: currentModelDetails.name,
-            serverEnv,
-            apiKeys,
-            providerSettings,
-          }),
-          chatMode === 'build' ? systemPrompt : discussPrompt(),
-          currentModelDetails.maxTokenAllowed || dynamicMaxTokens
-        );
-      }, `LLM call to ${provider.name} (attempt ${fallbackCount + 1})`);
+      retryResult = await rateLimitRetryHandler.executeWithRetry(
+        async () => {
+          return await executeStreamTextWithTimeout(
+            provider.getModelInstance({
+              model: currentModelDetails.name,
+              serverEnv,
+              apiKeys,
+              providerSettings,
+            }),
+            chatMode === 'build' ? systemPrompt : discussPrompt(),
+            currentModelDetails.maxTokenAllowed || dynamicMaxTokens,
+          );
+        },
+        `LLM call to ${provider.name} (attempt ${fallbackCount + 1})`,
+      );
 
       if (retryResult.success) {
         if (fallbackCount > 0) {
           logger.info(`🎉 نجح المزود البديل: ${currentModelDetails.name} (${provider.name})`);
           logger.info(`📡 تم تأسيس الاتصال بنجاح، جاري معالجة طلبك...`);
         }
-        
+
         if (retryResult.attempts > 1) {
           logger.info(
             `LLM call succeeded after ${retryResult.attempts} attempts with ${retryResult.totalDelay}ms total delay`,
           );
         }
-        
+
         return retryResult.data!;
       }
 
@@ -275,15 +275,15 @@ export async function streamText(props: {
       if (fallbackManager.shouldUseFallback(retryResult.error) && fallbackCount < maxFallbackAttempts) {
         logger.warn(`Provider failed, trying fallback. Error: ${retryResult.error?.message}`);
         logger.info('🔄 جاري البحث عن مزود بديل...');
-        
+
         // Emit provider switch event for UI indicator
         if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'test') {
-          logger.info('PROVIDER_SWITCH_START', { 
-            currentProvider: provider.name, 
-            maxAttempts: maxFallbackAttempts 
+          logger.info('PROVIDER_SWITCH_START', {
+            currentProvider: provider.name,
+            maxAttempts: maxFallbackAttempts,
           });
         }
-        
+
         const fallback = await fallbackManager.getNextFallbackModel(currentModelDetails.name, provider.name, {
           apiKeys,
           providerSettings,
@@ -293,7 +293,7 @@ export async function streamText(props: {
         if (fallback) {
           // Update provider and model for next attempt
           provider = fallback.provider;
-          
+
           // Get model details for fallback
           const fallbackStaticModels = LLMManager.getInstance().getStaticModelListFromProvider(fallback.provider);
           let fallbackModelDetails = fallbackStaticModels.find((m) => m.name === fallback.model);
@@ -310,16 +310,16 @@ export async function streamText(props: {
           if (fallbackModelDetails) {
             logger.info(`✅ تم العثور على مزود بديل: ${fallback.model} (${fallback.provider.name})`);
             logger.info(`🚀 جاري الاتصال بالمزود البديل...`);
-            
+
             // Emit connecting event
             if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'test') {
-              logger.info('PROVIDER_SWITCH_CONNECTING', { 
+              logger.info('PROVIDER_SWITCH_CONNECTING', {
                 targetProvider: fallback.provider.name,
                 targetModel: fallback.model,
-                currentProvider: provider.name 
+                currentProvider: provider.name,
               });
             }
-            
+
             currentModelDetails = fallbackModelDetails;
             fallbackCount++;
             continue; // Try with fallback
@@ -331,14 +331,13 @@ export async function streamText(props: {
 
       // If we reach here, no more fallbacks available or shouldn't use fallback
       throw retryResult.error || new Error('LLM call failed');
-      
     } catch (error: any) {
       logger.error(`Attempt ${fallbackCount + 1} failed:`, error);
-      
+
       // If this is the last attempt, throw the error
       if (fallbackCount >= maxFallbackAttempts) {
         const errorMessage = error?.message || 'Unknown error';
-        const isTemporaryError = 
+        const isTemporaryError =
           errorMessage.includes('temporarily rate-limited') ||
           errorMessage.includes('no endpoints found') ||
           errorMessage.includes('timeout') ||
@@ -347,15 +346,17 @@ export async function streamText(props: {
         if (isTemporaryError) {
           logger.error(`💥 جميع المزودين غير متاحين مؤقتاً: ${errorMessage}`);
           throw new Error(
-            `⚠️ جميع المزودين غير متاحين مؤقتاً. يرجى المحاولة مرة أخرى لاحقاً. آخر خطأ: ${errorMessage}`
+            `⚠️ جميع المزودين غير متاحين مؤقتاً. يرجى المحاولة مرة أخرى لاحقاً. آخر خطأ: ${errorMessage}`,
           );
         } else {
           logger.error(`💥 فشل في جميع المحاولات بعد ${fallbackCount + 1} محاولات`);
           logger.error(`🚫 لا توجد مزودات ذكاء اصطناعي متاحة حالياً`);
-          throw new Error(`⚠️ فشل في الاتصال بجميع المزودين المتاحين. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى. آخر خطأ: ${errorMessage}`);
+          throw new Error(
+            `⚠️ فشل في الاتصال بجميع المزودين المتاحين. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى. آخر خطأ: ${errorMessage}`,
+          );
         }
       }
-      
+
       // Try to get next fallback for next iteration
       try {
         const fallback = await fallbackManager.getNextFallbackModel(currentModelDetails.name, provider.name, {
@@ -366,6 +367,7 @@ export async function streamText(props: {
 
         if (fallback) {
           provider = fallback.provider;
+
           const fallbackStaticModels = LLMManager.getInstance().getStaticModelListFromProvider(fallback.provider);
           let fallbackModelDetails = fallbackStaticModels.find((m) => m.name === fallback.model);
 
@@ -387,7 +389,7 @@ export async function streamText(props: {
       } catch (fallbackError) {
         logger.error('Error getting fallback:', fallbackError);
       }
-      
+
       // No more fallbacks available
       throw error;
     }

@@ -61,35 +61,35 @@ const DEFAULT_CONFIG: LoggerConfig = {
 };
 
 export class SecureLogger {
-  private config: LoggerConfig;
-  private logs: LogEntry[] = [];
-  private sessionId: string;
-  private userId?: string;
+  private _config: LoggerConfig;
+  private _logs: LogEntry[] = [];
+  private _sessionId: string;
+  private _userId?: string;
 
   constructor(config: Partial<LoggerConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    this.sessionId = this.generateSessionId();
-    this.initializeStorage();
+    this._config = { ...DEFAULT_CONFIG, ...config };
+    this._sessionId = this._generateSessionId();
+    this._initializeStorage();
   }
 
   /**
    * توليد معرف جلسة فريد
    */
-  private generateSessionId(): string {
+  private _generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
    * تهيئة التخزين المحلي
    */
-  private initializeStorage(): void {
-    if (this.config.enableStorage && typeof window !== 'undefined') {
+  private _initializeStorage(): void {
+    if (this._config.enableStorage && typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('secure_logs');
 
         if (stored) {
           const parsedLogs = JSON.parse(stored);
-          this.logs = parsedLogs.slice(-this.config.maxEntries);
+          this._logs = parsedLogs.slice(-this._config.maxEntries);
         }
       } catch (error) {
         console.warn('Failed to load stored logs:', error);
@@ -100,18 +100,18 @@ export class SecureLogger {
   /**
    * تنظيف البيانات الحساسة
    */
-  private sanitizeData(data: any): any {
+  private _sanitizeData(data: any): any {
     if (data === null || data === undefined) {
       return data;
     }
 
     if (typeof data === 'string') {
-      return this.sanitizeString(data);
+      return this._sanitizeString(data);
     }
 
     if (typeof data === 'object') {
       if (Array.isArray(data)) {
-        return data.map((item) => this.sanitizeData(item));
+        return data.map((item) => this._sanitizeData(item));
       }
 
       const sanitized: any = {};
@@ -120,10 +120,10 @@ export class SecureLogger {
         const lowerKey = key.toLowerCase();
 
         // فحص المفاتيح الحساسة
-        if (this.config.sensitiveKeys.some((sensitiveKey) => lowerKey.includes(sensitiveKey.toLowerCase()))) {
+        if (this._config.sensitiveKeys.some((sensitiveKey) => lowerKey.includes(sensitiveKey.toLowerCase()))) {
           sanitized[key] = '[REDACTED]';
         } else {
-          sanitized[key] = this.sanitizeData(value);
+          sanitized[key] = this._sanitizeData(value);
         }
       }
 
@@ -136,11 +136,11 @@ export class SecureLogger {
   /**
    * تنظيف النصوص
    */
-  private sanitizeString(text: string): string {
+  private _sanitizeString(text: string): string {
     let sanitized = text;
 
     // تطبيق أنماط الإخفاء
-    this.config.maskPatterns.forEach((pattern) => {
+    this._config.maskPatterns.forEach((pattern) => {
       sanitized = sanitized.replace(pattern, '[MASKED]');
     });
 
@@ -150,56 +150,56 @@ export class SecureLogger {
   /**
    * إنشاء معرف فريد للسجل
    */
-  private generateLogId(): string {
+  private _generateLogId(): string {
     return `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
    * تسجيل رسالة
    */
-  private log(level: LogEntry['level'], message: string, context?: Record<string, any>, error?: Error): void {
+  private _log(level: LogEntry['level'], message: string, context?: Record<string, any>, error?: Error): void {
     const entry: LogEntry = {
-      id: this.generateLogId(),
+      id: this._generateLogId(),
       timestamp: Date.now(),
       level,
-      message: this.sanitizeString(message),
-      context: context ? this.sanitizeData(context) : undefined,
-      userId: this.userId,
-      sessionId: this.sessionId,
+      message: this._sanitizeString(message),
+      context: context ? this._sanitizeData(context) : undefined,
+      userId: this._userId,
+      sessionId: this._sessionId,
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
       url: typeof window !== 'undefined' ? window.location.href : undefined,
-      stack: error?.stack ? this.sanitizeString(error.stack) : undefined,
+      stack: error?.stack ? this._sanitizeString(error.stack) : undefined,
       sanitized: true,
     };
 
     // إضافة للسجلات المحلية
-    this.logs.push(entry);
+    this._logs.push(entry);
 
     // الحفاظ على الحد الأقصى للسجلات
-    if (this.logs.length > this.config.maxEntries) {
-      this.logs = this.logs.slice(-this.config.maxEntries);
+    if (this._logs.length > this._config.maxEntries) {
+      this._logs = this._logs.slice(-this._config.maxEntries);
     }
 
     // حفظ في التخزين المحلي
-    if (this.config.enableStorage) {
-      this.saveToStorage();
+    if (this._config.enableStorage) {
+      this._saveToStorage();
     }
 
     // طباعة في وحدة التحكم
-    if (this.config.enableConsole) {
-      this.logToConsole(entry);
+    if (this._config.enableConsole) {
+      this._logToConsole(entry);
     }
 
     // إرسال للخادم البعيد
-    if (this.config.enableRemote && this.config.remoteEndpoint) {
-      this.sendToRemote(entry);
+    if (this._config.enableRemote && this._config.remoteEndpoint) {
+      this._sendToRemote(entry);
     }
   }
 
   /**
    * طباعة في وحدة التحكم
    */
-  private logToConsole(entry: LogEntry): void {
+  private _logToConsole(entry: LogEntry): void {
     const { level, message, context } = entry;
     const logMethod = level === 'critical' ? console.error : (console[level as keyof Console] as any) || console.log;
 
@@ -213,10 +213,10 @@ export class SecureLogger {
   /**
    * حفظ في التخزين المحلي
    */
-  private saveToStorage(): void {
+  private _saveToStorage(): void {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('secure_logs', JSON.stringify(this.logs));
+        localStorage.setItem('secure_logs', JSON.stringify(this._logs));
       } catch (error) {
         console.warn('Failed to save logs to storage:', error);
       }
@@ -226,13 +226,13 @@ export class SecureLogger {
   /**
    * إرسال للخادم البعيد
    */
-  private async sendToRemote(entry: LogEntry): Promise<void> {
-    if (!this.config.remoteEndpoint) {
+  private async _sendToRemote(entry: LogEntry): Promise<void> {
+    if (!this._config.remoteEndpoint) {
       return;
     }
 
     try {
-      await fetch(this.config.remoteEndpoint, {
+      await fetch(this._config.remoteEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -241,7 +241,7 @@ export class SecureLogger {
       });
     } catch (error) {
       // فشل في الإرسال - لا نريد إنشاء حلقة لا نهائية من الأخطاء
-      if (this.config.enableConsole) {
+      if (this._config.enableConsole) {
         console.warn('Failed to send log to remote endpoint:', error);
       }
     }
@@ -251,35 +251,35 @@ export class SecureLogger {
    * تسجيل رسالة تصحيح
    */
   debug(message: string, context?: Record<string, any>): void {
-    this.log('debug', message, context);
+    this._log('debug', message, context);
   }
 
   /**
    * تسجيل رسالة معلومات
    */
   info(message: string, context?: Record<string, any>): void {
-    this.log('info', message, context);
+    this._log('info', message, context);
   }
 
   /**
    * تسجيل رسالة تحذير
    */
   warn(message: string, context?: Record<string, any>): void {
-    this.log('warn', message, context);
+    this._log('warn', message, context);
   }
 
   /**
    * تسجيل رسالة خطأ
    */
   error(message: string, error?: Error, context?: Record<string, any>): void {
-    this.log('error', message, context, error);
+    this._log('error', message, context, error);
   }
 
   /**
    * تسجيل رسالة خطأ حرج
    */
   critical(message: string, error?: Error, context?: Record<string, any>): void {
-    this.log('critical', message, context, error);
+    this._log('critical', message, context, error);
   }
 
   /**
@@ -298,10 +298,10 @@ export class SecureLogger {
    */
   logApiError(url: string, method: string, status: number, error: Error, requestData?: any): void {
     this.error('API Request Failed', error, {
-      url: this.sanitizeString(url),
+      url: this._sanitizeString(url),
       method,
       status,
-      requestData: requestData ? this.sanitizeData(requestData) : undefined,
+      requestData: requestData ? this._sanitizeData(requestData) : undefined,
     });
   }
 
@@ -311,7 +311,7 @@ export class SecureLogger {
   logUserActivity(action: string, details?: Record<string, any>): void {
     this.info(`User Activity: ${action}`, {
       action,
-      details: details ? this.sanitizeData(details) : undefined,
+      details: details ? this._sanitizeData(details) : undefined,
       timestamp: new Date().toISOString(),
     });
   }
@@ -323,7 +323,7 @@ export class SecureLogger {
     this.info(`Performance: ${operation}`, {
       operation,
       duration,
-      details: details ? this.sanitizeData(details) : undefined,
+      details: details ? this._sanitizeData(details) : undefined,
     });
   }
 
@@ -331,21 +331,21 @@ export class SecureLogger {
    * تعيين معرف المستخدم
    */
   setUserId(userId: string): void {
-    this.userId = this.sanitizeString(userId);
+    this._userId = this._sanitizeString(userId);
   }
 
   /**
    * مسح معرف المستخدم
    */
   clearUserId(): void {
-    this.userId = undefined;
+    this._userId = undefined;
   }
 
   /**
    * الحصول على السجلات
    */
   getLogs(filter?: { level?: LogEntry['level']; since?: number; limit?: number }): LogEntry[] {
-    let filteredLogs = [...this.logs];
+    let filteredLogs = [...this._logs];
 
     if (filter?.level) {
       filteredLogs = filteredLogs.filter((log) => log.level === filter.level);
@@ -370,7 +370,7 @@ export class SecureLogger {
       const headers = ['timestamp', 'level', 'message', 'userId', 'sessionId', 'url'];
       const csvRows = [headers.join(',')];
 
-      this.logs.forEach((log) => {
+      this._logs.forEach((log) => {
         const row = [
           new Date(log.timestamp).toISOString(),
           log.level,
@@ -385,16 +385,16 @@ export class SecureLogger {
       return csvRows.join('\n');
     }
 
-    return JSON.stringify(this.logs, null, 2);
+    return JSON.stringify(this._logs, null, 2);
   }
 
   /**
    * مسح السجلات
    */
   clearLogs(): void {
-    this.logs = [];
+    this._logs = [];
 
-    if (this.config.enableStorage && typeof window !== 'undefined') {
+    if (this._config.enableStorage && typeof window !== 'undefined') {
       localStorage.removeItem('secure_logs');
     }
   }
@@ -409,7 +409,7 @@ export class SecureLogger {
     newestTimestamp?: number;
   } {
     const stats = {
-      total: this.logs.length,
+      total: this._logs.length,
       byLevel: {
         debug: 0,
         info: 0,
@@ -421,11 +421,11 @@ export class SecureLogger {
       newestTimestamp: undefined as number | undefined,
     };
 
-    if (this.logs.length > 0) {
-      stats.oldestTimestamp = this.logs[0].timestamp;
-      stats.newestTimestamp = this.logs[this.logs.length - 1].timestamp;
+    if (this._logs.length > 0) {
+      stats.oldestTimestamp = this._logs[0].timestamp;
+      stats.newestTimestamp = this._logs[this._logs.length - 1].timestamp;
 
-      this.logs.forEach((log) => {
+      this._logs.forEach((log) => {
         stats.byLevel[log.level]++;
       });
     }

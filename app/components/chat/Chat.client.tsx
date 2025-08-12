@@ -148,7 +148,7 @@ export const ChatImpl = memo(
     const [imageDataList, setImageDataList] = useState<string[]>([]);
     const [searchParams, setSearchParams] = useSearchParams();
     const [fakeLoading, setFakeLoading] = useState(false);
-    
+
     // Provider switch indicator state
     const {
       isVisible: isProviderSwitchVisible,
@@ -162,7 +162,7 @@ export const ChatImpl = memo(
       showConnected,
       showFailed,
       updateAttempt,
-      hide: hideIndicator
+      hide: hideIndicator,
     } = useProviderSwitchIndicator();
     const files = useStore(workbenchStore.files);
     const [designScheme, setDesignScheme] = useState<DesignScheme>(defaultDesignScheme);
@@ -821,7 +821,7 @@ export const ChatImpl = memo(
           setSelectedElement={setSelectedElement}
           addToolResult={addToolResult}
         />
-        
+
         {/* Provider Switch Indicator */}
         <ProviderSwitchIndicator
           isVisible={isProviderSwitchVisible}
